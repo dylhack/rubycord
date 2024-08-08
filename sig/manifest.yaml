@@ -1,3 +1,0 @@
-dependencies:
-  - name: net-http
-  - name: logger

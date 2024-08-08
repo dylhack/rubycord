@@ -1,9 +1,19 @@
 # frozen_string_literal: true
 
 require "rspec"
-require "discorb"
+require "rubycord"
 require "async"
 require "async/rspec"
+
+def load_payload(name, **options)
+  @payloads ||= {}
+  options ||= {}
+  options[:symbolize_names] ||= true
+  @payloads[name] ||= JSON.parse(
+    File.read("#{__dir__}/payloads/#{name}"),
+    **options,
+  )
+end
 
 Response = Struct.new(:code, :body)
 RSpec.shared_context "mocks" do # rubocop:disable RSpec/ContextWording
@@ -32,7 +42,7 @@ RSpec.shared_context "mocks" do # rubocop:disable RSpec/ContextWording
   end
 
   let(:http) do
-    http = instance_double(Discorb::HTTP)
+    http = instance_double(RubyCord::Client::HTTP)
     allow(http).to receive(:request) { |path, body, headers|
       body = nil if %i[get delete].include?(path.method)
       expect(
@@ -69,11 +79,10 @@ RSpec.shared_context "mocks" do # rubocop:disable RSpec/ContextWording
     http
   end
   let(:client) do
-    client = Discorb::Client.new
+    client = RubyCord::Client.new
     client.instance_variable_set(:@http, http)
     client.instance_variable_set(:@connection, :dummy)
-    allow(client).to receive(:http).and_return(http)
-    allow(client).to receive(:handle_heartbeat).and_return(Async { nil })
+    allow(client).to receive_messages(http:, handle_heartbeat: Async { nil })
     allow(client).to receive(:send_gateway) { |opcode, **payload|
       if $next_gateway_request
         expect({ opcode:, payload: }).to eq(
@@ -86,10 +95,10 @@ RSpec.shared_context "mocks" do # rubocop:disable RSpec/ContextWording
     $next_gateway_request[:opcode] = 2
     $next_gateway_request[:payload] = {
       compress: false,
-      intents: Discorb::Intents.default.value,
+      intents: RubyCord::Client::Gateway::Intents.default.value,
       properties: {
-        "browser" => "discorb",
-        "device" => "discorb",
+        "browser" => "rubycord",
+        "device" => "rubycord",
         "os" => RUBY_PLATFORM
       },
       token: "Token"
@@ -101,24 +110,15 @@ RSpec.shared_context "mocks" do # rubocop:disable RSpec/ContextWording
     end
     client.token = "Token"
     client.handle_gateway(
-      JSON.parse(
-        File.read("#{__dir__}/payloads/hello.json"),
-        symbolize_names: true
-      ),
+      load_payload("hello.json"),
       false
     ).wait
     client.handle_gateway(
-      JSON.parse(
-        File.read("#{__dir__}/payloads/ready.json"),
-        symbolize_names: true
-      ),
+      load_payload("ready.json"),
       false
     ).wait
     client.handle_gateway(
-      JSON.parse(
-        File.read("#{__dir__}/payloads/guild_create.json"),
-        symbolize_names: true
-      ),
+      load_payload("guild_create.json"),
       false
     ).wait
     client

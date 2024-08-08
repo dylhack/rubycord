@@ -5,8 +5,4 @@
 --tag async:"Async"
 --hide-tag async
 --verbose
---asset docs/assets:assets
---asset assets:assets
 -
-docs/**/*.md
-Changelog.md
